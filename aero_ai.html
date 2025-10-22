@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aero.AI - Aerodynamics Engineering Specialist</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'aero-blue': '#0056b3',
+                        'aero-light': '#f0f4f8',
+                        'aero-accent': '#00c3ff',
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        .chat-bubble {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .ai-bg {
+            background-color: #e6f0fa;
+        }
+        .user-bg {
+            background-color: #e0f7fa;
+        }
+        .source-link {
+            transition: all 0.2s;
+        }
+        .source-link:hover {
+            opacity: 0.8;
+            transform: translateY(-1px);
+        }
+        /* Custom styles for LaTeX math notation, making it stand out */
+        .math-display {
+            display: block;
+            background-color: #ffffff;
+            border: 1px solid #cceeff;
+            padding: 10px;
+            margin: 10px 0;
+            overflow-x: auto;
+            font-family: monospace;
+            font-size: 1.1em;
+            color: #0056b3;
+            border-radius: 4px;
+        }
+        .math-inline {
+            background-color: #f0f8ff;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
+            color: #0056b3;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-aero-light min-h-screen flex items-center justify-center p-4">
+
+    <!-- Aero.AI Main Container -->
+    <div class="w-full max-w-4xl bg-white rounded-xl shadow-2xl flex flex-col h-[90vh]">
+        <!-- Header -->
+        <header class="bg-aero-blue p-4 rounded-t-xl text-white shadow-md flex items-center justify-center">
+            <svg class="w-8 h-8 mr-3 text-aero-accent" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM6 9a2 2 0 100-4 2 2 0 000 4zm7-2a2 2 0 11-4 0 2 2 0 014 0zm-1 9a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+            </svg>
+            <h1 class="text-3xl font-bold tracking-wider">Aero.AI</h1>
+            <span class="ml-2 text-sm text-aero-accent">| Specialist</span>
+        </header>
+
+        <!-- Chat History Area -->
+        <main id="chatHistory" class="flex-grow p-6 overflow-y-auto space-y-4">
+            <!-- Initial Message -->
+            <div class="flex justify-start">
+                <div class="chat-bubble ai-bg p-3 rounded-xl rounded-bl-none max-w-3xl text-gray-700">
+                    <p class="font-semibold text-aero-blue">Aero.AI</p>
+                    <p>Welcome. I am a world-class Aerodynamics Engineering Specialist. Ask me any technical question about fluid dynamics, lift, drag, aircraft design, or high-speed flow analysis.</p>
+                </div>
+            </div>
+            <!-- Messages will be injected here -->
+        </main>
+
+        <!-- Input Area and Loader -->
+        <div class="p-4 border-t border-gray-200">
+            <div id="loadingIndicator" class="hidden flex items-center justify-center mb-3 p-2 bg-yellow-100 rounded-lg">
+                <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-aero-blue" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span class="text-sm text-gray-700">Analyzing complex flow dynamics...</span>
+            </div>
+
+            <div class="flex space-x-3">
+                <input type="text" id="userInput" placeholder="e.g., Explain the effect of wing sweep on critical Mach number."
+                       class="flex-grow p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-aero-blue focus:border-aero-blue transition duration-150"
+                       onkeydown="if(event.key === 'Enter') sendMessage()">
+                <button id="sendButton" 
+                        class="bg-aero-blue hover:bg-aero-blue/90 text-white font-semibold py-3 px-6 rounded-lg shadow-md transition duration-200 disabled:bg-gray-400">
+                    Ask
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Global variables for Firebase environment (MANDATORY)
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        // Base API configuration
+        const API_KEY = ""; // Kept empty, provided by the Canvas environment
+        const MODEL_NAME = "gemini-2.5-flash-preview-09-2025";
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL_NAME}:generateContent?key=${API_KEY}`;
+
+        // System Instruction defining the Aero.AI persona
+        const AERO_AI_SYSTEM_INSTRUCTION = {
+            parts: [{
+                text: "You are Aero.AI, a world-class, extremely detailed, and precise Aerodynamics Engineering Specialist. Your primary role is to analyze, explain, and provide technical guidance on all matters related to flight physics, fluid dynamics, aircraft design, high-speed flow, and drag reduction. When answering, cite your sources and use accurate technical terminology. Structure your response clearly, starting with a direct answer, followed by a detailed technical explanation and relevant engineering context."
+            }]
+        };
+
+        const chatHistory = document.getElementById('chatHistory');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        
+        // **FIX**: Attach event listeners in the module, not via inline HTML attributes.
+        // This ensures the button can call the function which is module-scoped.
+        sendButton.addEventListener('click', sendMessage);
+
+        // Utility function for exponential backoff retry logic
+        async function fetchWithRetry(url, options, maxRetries = 5) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) return response;
+                    if (response.status === 429 && i < maxRetries - 1) { // Rate limit or transient error
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        console.warn(`API rate limit hit. Retrying in ${Math.round(delay / 1000)}s...`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    throw new Error(`API request failed with status ${response.status}: ${response.statusText}`);
+                } catch (error) {
+                    console.error("Fetch error:", error);
+                    throw error;
+                }
+            }
+            throw new Error(`API failed after ${maxRetries} retries.`);
+        }
+
+        /**
+         * Function to render Markdown text to HTML, including basic math notation support.
+         */
+        function renderMarkdown(markdownText) {
+            let html = markdownText;
+
+            // 1. Handle Display Math (e.g., $$ E = mc^2 $$)
+            html = html.replace(/\$\$(.*?)\$\$/gs, '<div class="math-display">$1</div>');
+
+            // 2. Handle Inline Math (e.g., $C_L$)
+            html = html.replace(/\$(.*?)\$/g, '<span class="math-inline">$1</span>');
+            
+            // 3. Basic Markdown conversion for strong emphasis and lists
+            html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            
+            // Convert list items (* or - followed by a space)
+            html = html.split('\n').map(line => {
+                if (line.match(/^(\*|-)\s/)) {
+                    // Check if the line is part of a list and not just starting with * or -
+                    return `<li>${line.substring(2).trim()}</li>`;
+                }
+                return line;
+            }).join('\n');
+
+            // Wrap contiguous text lines in <p> tags for line breaks
+            html = html.split('\n\n').map(p => {
+                const trimmed = p.trim();
+                if (trimmed.startsWith('<li>')) {
+                    // If it starts with a list item, assume it's a list block
+                    return `<ul>${trimmed}</ul>`;
+                } else if (trimmed !== '') {
+                    // Otherwise, wrap in paragraph tags
+                    return `<p class="mb-2">${trimmed}</p>`;
+                }
+                return ''; // Ignore empty lines resulting from split
+            }).join('');
+            
+            // Remove empty <ul></ul> wrappers
+            html = html.replace(/<ul>\s*<\/ul>/g, '');
+
+            return html;
+        }
+
+        // Function to add a message to the chat history
+        function addMessage(text, role, sources = []) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`;
+
+            const bubbleClass = role === 'user' ? 'user-bg rounded-br-none' : 'ai-bg rounded-bl-none';
+            const roleName = role === 'user' ? 'You' : 'Aero.AI';
+            const textColor = role === 'user' ? 'text-gray-800' : 'text-gray-700';
+
+            // Create the bubble content
+            let contentHTML = `<p class="font-semibold ${role === 'user' ? 'text-gray-900' : 'text-aero-blue'}">${roleName}</p>`;
+            
+            if (role === 'ai') {
+                 // Render AI response using Markdown and math conversion
+                contentHTML += renderMarkdown(text);
+            } else {
+                contentHTML += `<p class="${textColor}">${text}</p>`;
+            }
+
+            // Add sources if available and it's an AI response
+            if (role === 'ai' && sources.length > 0) {
+                const sourceList = sources.map((s, index) =>
+                    `<a href="${s.uri}" target="_blank" rel="noopener noreferrer" 
+                       class="source-link text-xs text-aero-blue hover:underline block mt-1 transition duration-150">
+                        [Source ${index + 1}] ${s.title}
+                    </a>`
+                ).join('');
+                contentHTML += `<div class="mt-2 pt-2 border-t border-gray-300 text-xs text-gray-600">
+                                    <p class="font-medium mb-1">Grounding Sources:</p>
+                                    ${sourceList}
+                                </div>`;
+            }
+
+            // The main bubble
+            messageDiv.innerHTML = `
+                <div class="chat-bubble ${bubbleClass} p-4 rounded-xl max-w-3xl ${textColor}">
+                    ${contentHTML}
+                </div>
+            `;
+            
+            chatHistory.appendChild(messageDiv);
+            chatHistory.scrollTop = chatHistory.scrollHeight; // Auto-scroll to bottom
+        }
+
+        // Main function to send the message and call the API
+        async function sendMessage() {
+            const query = userInput.value.trim();
+            if (!query) return;
+
+            // 1. Display user message
+            addMessage(query, 'user');
+            userInput.value = '';
+            sendButton.disabled = true;
+            loadingIndicator.classList.remove('hidden');
+
+            try {
+                // 2. Construct the API payload
+                const payload = {
+                    contents: [{ parts: [{ text: query }] }],
+                    // Use Google Search for real-time, grounded information
+                    tools: [{ "google_search": {} }],
+                    // Apply the specialized Aero.AI persona
+                    systemInstruction: AERO_AI_SYSTEM_INSTRUCTION,
+                };
+
+                const options = {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                };
+
+                const response = await fetchWithRetry(API_URL, options);
+                const result = await response.json();
+
+                // 3. Process the response and extract data
+                const candidate = result.candidates?.[0];
+                let generatedText = "Error: Could not retrieve a valid response from Aero.AI.";
+                let sources = [];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    generatedText = candidate.content.parts[0].text;
+
+                    // Extract grounding sources
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
+                            }))
+                            .filter(source => source.uri && source.title);
+                    }
+                }
+
+                // 4. Display AI response
+                addMessage(generatedText, 'ai', sources);
+
+            } catch (error) {
+                console.error('Aero.AI API Error:', error);
+                // 4b. Display a user-friendly error message
+                addMessage(`Aero.AI encountered a network or computational issue. Please check your browser's console for more details, or try again in a moment. Error: ${error.message}`, 'ai');
+            } finally {
+                // 5. Cleanup - This is the crucial step to re-enable the UI
+                sendButton.disabled = false;
+                loadingIndicator.classList.add('hidden');
+                userInput.focus();
+            }
+        }
+    </script>
+</body>
+</html>
